@@ -95,6 +95,9 @@ else:
 
 # Start the application
 if __name__ == "__main__":
+    # Add backend directory to Python path
+    sys.path.insert(0, str(current_dir))
+    
     # Import and run the main application
     from app.main import app
     import uvicorn

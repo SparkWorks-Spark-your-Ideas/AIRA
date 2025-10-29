@@ -13,6 +13,14 @@ Total GPU Memory Usage: ~3.7GB (fits in RTX 4050 6GB)
 Real Data Pipeline: Financial DB, Market News, Vector Store, Compliance DB, Risk API
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Add backend directory to Python path
+backend_dir = Path(__file__).parent
+sys.path.insert(0, str(backend_dir))
+
 import asyncio
 import logging
 import uvicorn

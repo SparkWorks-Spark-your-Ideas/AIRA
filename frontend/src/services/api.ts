@@ -72,9 +72,15 @@ class APIService {
       const data = await response.json();
       console.log('✅ API Response data:', data);
       console.log('🔍 Full response structure:', JSON.stringify(data, null, 2));
-      console.log('🔍 Agents in response:', data.agents);
-      console.log('🔍 Response keys:', Object.keys(data));
-      return data;
+      
+      // Backend returns { status: "success", analysis_results: {...} }
+      // We need to unwrap the analysis_results
+      const analysisData = data.analysis_results || data;
+      
+      console.log('🔍 Unwrapped analysis data:', analysisData);
+      console.log('🔍 Agents in response:', analysisData.agents);
+      console.log('🔍 Response keys:', Object.keys(analysisData));
+      return analysisData;
     } catch (error) {
       console.error('❌ API Error:', error);
       throw new Error(`Failed to analyze scenario: ${error instanceof Error ? error.message : 'Unknown error'}`);

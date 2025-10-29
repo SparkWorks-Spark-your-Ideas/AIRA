@@ -20,17 +20,39 @@ export default function Reports() {
   } = useReports();
 
   const [showDevTools, setShowDevTools] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Load only real analysis data - no sample data
   useEffect(() => {
-    if (!isLoading) {
-      if (hasData) {
-        console.log(`📊 Reports loaded with ${totalAnalyses} real analyses`);
-      } else {
-        console.log('📊 No real analysis data found - run analyses from Dashboard to populate reports');
+    try {
+      if (!isLoading) {
+        if (hasData) {
+          console.log(`📊 Reports loaded with ${totalAnalyses} real analyses`);
+        } else {
+          console.log('📊 No real analysis data found - run analyses from Dashboard to populate reports');
+        }
       }
+    } catch (err) {
+      console.error('Error in Reports useEffect:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
     }
   }, [isLoading, hasData, totalAnalyses, hasRealData]);
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Reports</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()} className="accent-button">
+            Reload Page
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading state
   if (isLoading) {
@@ -245,7 +267,7 @@ export default function Reports() {
                   <CardTitle className="text-black text-base sm:text-lg">Decision Priority Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {currentMetrics.priorityDistribution.length > 0 ? (
+                  {(currentMetrics?.priorityDistribution?.length || 0) > 0 ? (
                     <ResponsiveContainer width="100%" height={180}>
                       <BarChart data={currentMetrics.priorityDistribution}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -276,7 +298,7 @@ export default function Reports() {
                   <CardTitle className="text-black text-base sm:text-lg">Decision Status Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {currentMetrics.statusDistribution.length > 0 ? (
+                  {(currentMetrics?.statusDistribution?.length || 0) > 0 ? (
                     <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
                         <Pie
@@ -288,7 +310,7 @@ export default function Reports() {
                           paddingAngle={2}
                           dataKey="count"
                         >
-                          {currentMetrics.statusDistribution.map((entry, index) => (
+                          {(currentMetrics?.statusDistribution || []).map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.fill} />
                           ))}
                         </Pie>
@@ -316,7 +338,7 @@ export default function Reports() {
                   <CardTitle className="text-black text-base sm:text-lg">AI Confidence Score Analysis</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {currentMetrics.confidenceData.length > 0 ? (
+                  {(currentMetrics?.confidenceData?.length || 0) > 0 ? (
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={currentMetrics.confidenceData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -365,27 +387,27 @@ export default function Reports() {
                 <CardHeader className="pb-2 flex flex-row items-center justify-between">
                   <CardTitle className="text-black text-base sm:text-lg">Recent Strategic Decisions</CardTitle>
                   <Badge variant="secondary" className="text-xs">
-                    {recentDecisions.length} analyses
+                    {recentDecisions?.length || 0} analyses
                   </Badge>
                 </CardHeader>
                 <CardContent>
-                  {recentDecisions.length > 0 ? (
+                  {(recentDecisions?.length || 0) > 0 ? (
                     <div className="space-y-3">
-                      {recentDecisions.slice(0, 10).map((decision) => (
+                      {(recentDecisions || []).slice(0, 10).map((decision) => (
                         <div 
                           key={decision.id}
                           className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:border-emerald-300 transition-colors"
                         >
                           <div className="flex-1">
                             <h4 className="font-medium text-black text-sm leading-tight mb-1">
-                              {decision.scenario}
+                              {decision.scenario || 'Unknown scenario'}
                             </h4>
                             <div className="flex items-center space-x-3 text-xs text-gray-500">
                               <span>{new Date(decision.timestamp).toLocaleDateString()}</span>
                               <span>•</span>
-                              <span>{decision.execution_time_seconds.toFixed(1)}s</span>
+                              <span>{(decision.execution_time_seconds || 0).toFixed(1)}s</span>
                               <span>•</span>
-                              <span>{decision.agents_utilized.length} agents</span>
+                              <span>{(decision.agents_utilized?.length || 0)} agents</span>
                             </div>
                           </div>
                           <div className="flex items-center space-x-3">
@@ -396,11 +418,11 @@ export default function Reports() {
                               }
                               className="text-xs"
                             >
-                              {decision.priority}
+                              {decision.priority || 'medium'}
                             </Badge>
                             <div className="text-right">
                               <div className="text-lg font-bold text-emerald-600">
-                                {decision.overall_confidence}%
+                                {decision.overall_confidence || 0}%
                               </div>
                               <div className="text-xs text-gray-500">confidence</div>
                             </div>

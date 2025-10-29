@@ -164,7 +164,12 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
   const addCompletedAnalysis = (analysis: any) => {
     console.log('AgentContext: Adding completed analysis for Reports', analysis);
-    setCompletedAnalyses(prev => [analysis, ...prev.slice(0, 99)]); // Keep last 100 analyses
+    console.log('AgentContext: Current completed analyses count:', completedAnalyses.length);
+    setCompletedAnalyses(prev => {
+      const updated = [analysis, ...prev.slice(0, 99)]; // Keep last 100 analyses
+      console.log('AgentContext: Updated completed analyses count:', updated.length);
+      return updated;
+    });
   };
 
   const resetAllAgents = () => {

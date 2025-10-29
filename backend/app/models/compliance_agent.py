@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 class ComplianceAgent:
     def __init__(self):
-        self.model_name = "nlpaueb/legal-bert-base-uncased"
+        # Using distilbert (already cached) - lighter and faster than BERT
+        self.model_name = "distilbert-base-uncased"  
         self.model = None
         self.tokenizer = None
         
@@ -46,83 +47,77 @@ class ComplianceAgent:
             await self.compliance_db.initialize()
             await self.vector_store.initialize()
             
-            # Load tokenizer with local cache - handle offline mode gracefully
-            try:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    self.model_name,
-                    cache_dir=self.cache_dir,
-                    local_files_only=True,  # Try offline first
-                    force_download=False
-                )
-            except OSError:
-                # If offline fails, try with download fallback (for start_optimized.py)
-                logger.warning("⚠️ Tokenizer not found offline, attempting download...")
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    self.model_name,
-                    cache_dir=self.cache_dir,
-                    local_files_only=False,
-                    force_download=False
-                )
+            # Find local cached model paths
+            import os
+            cache_dirs = [
+                os.path.join(os.getenv('HF_HOME', ''), 'hub'),
+                os.path.join(os.getenv('TRANSFORMERS_CACHE', ''), '')
+            ]
             
-            # Load Legal-BERT model with GPU/CPU optimization
-            try:
-                if self.device == "cuda":
-                    # GPU configuration - try offline first
-                    self.model = AutoModel.from_pretrained(
-                        self.model_name,
-                        cache_dir=self.cache_dir,
-                        torch_dtype=torch.float16,
-                        device_map="auto",
-                        use_safetensors=True,
-                        trust_remote_code=True,
-                        max_memory={0: "400MB", "cpu": "2GB"},
-                        local_files_only=True,
-                        force_download=False
-                    )
-                else:
-                    # CPU configuration - try offline first
-                    self.model = AutoModel.from_pretrained(
-                        self.model_name,
-                        cache_dir=self.cache_dir,
-                        torch_dtype=torch.float32,
-                        device_map={"": "cpu"},
-                        use_safetensors=True,
-                        trust_remote_code=True,
-                        low_cpu_mem_usage=True,
-                        local_files_only=True,
-                        force_download=False
-                    )
-            except OSError as e:
-                # If offline fails, try with download fallback (for start_optimized.py)
-                logger.warning(f"⚠️ Model not found offline, attempting download: {e}")
-                if self.device == "cuda":
-                    self.model = AutoModel.from_pretrained(
-                        self.model_name,
-                        cache_dir=self.cache_dir,
-                        torch_dtype=torch.float16,
-                        device_map="auto",
-                        use_safetensors=True,
-                        trust_remote_code=True,
-                        max_memory={0: "400MB", "cpu": "2GB"},
-                        local_files_only=False,
-                        force_download=False
-                    )
-                else:
-                    self.model = AutoModel.from_pretrained(
-                        self.model_name,
-                        cache_dir=self.cache_dir,
-                        torch_dtype=torch.float32,
-                        device_map={"": "cpu"},
-                        use_safetensors=True,
-                        trust_remote_code=True,
-                        low_cpu_mem_usage=True,
-                        local_files_only=False,
-                        force_download=False
-                    )
+            model_path = None
+            tokenizer_path = None
+            
+            for cache_base in cache_dirs:
+                if not cache_base or not os.path.exists(cache_base):
+                    continue
+                    
+                model_cache_path = os.path.join(cache_base, 'models--nlpaueb--legal-bert-base-uncased')
+                
+                if os.path.exists(model_cache_path):
+                    snapshots_dir = os.path.join(model_cache_path, 'snapshots')
+                    if os.path.exists(snapshots_dir):
+                        for snapshot in os.listdir(snapshots_dir):
+                            snapshot_path = os.path.join(snapshots_dir, snapshot)
+                            
+                            if not model_path and (os.path.exists(os.path.join(snapshot_path, 'model.safetensors')) or \
+                               os.path.exists(os.path.join(snapshot_path, 'pytorch_model.bin'))):
+                                model_path = snapshot_path
+                                logger.info(f"📂 Found model at: {model_path}")
+                            
+                            if not tokenizer_path and os.path.exists(os.path.join(snapshot_path, 'vocab.txt')):
+                                tokenizer_path = snapshot_path
+                                logger.info(f"📂 Found tokenizer at: {tokenizer_path}")
+                            
+                            if model_path and tokenizer_path:
+                                break
+                
+                if model_path and tokenizer_path:
+                    break
+            
+            # Use found paths or fallback to model name
+            tokenizer_to_load = tokenizer_path if tokenizer_path else self.model_name
+            model_to_load = model_path if model_path else self.model_name
+            
+            # Load tokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                tokenizer_to_load,
+                local_files_only=True,
+                trust_remote_code=False
+            )
+            
+            # Load DistilBERT model with GPU/CPU optimization
+            if self.device == "cuda":
+                # GPU configuration
+                self.model = AutoModel.from_pretrained(
+                    model_to_load,
+                    torch_dtype=torch.float16,
+                    device_map="auto",
+                    local_files_only=True,
+                    trust_remote_code=False,
+                    max_memory={0: "400MB", "cpu": "2GB"}
+                )
                 logger.info(f"✅ Compliance Agent ready on {self.device.upper()} - Legal-BERT (~0.3GB VRAM)")
             else:
+                # CPU configuration
+                self.model = AutoModel.from_pretrained(
+                    model_to_load,
+                    torch_dtype=torch.float32,
+                    local_files_only=True,
+                    trust_remote_code=False,
+                    low_cpu_mem_usage=True
+                )
+                self.model.to(self.device)
                 logger.info(f"✅ Compliance Agent ready on {self.device.upper()} - Legal-BERT (~0.4GB RAM)")
-
             
             self.is_ready = True  # Set ready flag after successful initialization
             

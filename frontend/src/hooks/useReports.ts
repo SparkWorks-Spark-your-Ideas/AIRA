@@ -89,12 +89,17 @@ export function useReports() {
 
   // Watch for new analyses completing in real-time
   useEffect(() => {
+    console.log('📊 useReports: completedAnalyses changed, count:', completedAnalyses?.length || 0);
+    
     if (completedAnalyses && completedAnalyses.length > 0) {
       console.log('📊 New real analysis detected in AgentContext, updating reports...');
+      console.log('📊 Latest analysis:', completedAnalyses[0]);
       
       // Add the latest analysis if it's not already in our local storage
       const latestAnalysis = completedAnalyses[0];
       const existingAnalyses = reportsService.getAllAnalyses();
+      
+      console.log('📊 Existing analyses count:', existingAnalyses.length);
       
       // Check if this analysis is already stored (by timestamp and scenario)
       const alreadyStored = existingAnalyses.some(existing => 
@@ -102,10 +107,15 @@ export function useReports() {
         existing.scenario === latestAnalysis.scenario
       );
       
+      console.log('📊 Analysis already stored?', alreadyStored);
+      
       if (!alreadyStored) {
         console.log('➕ Adding new real analysis to reports');
         reportsService.addAnalysis(latestAnalysis);
         refreshData();
+        console.log('✅ Reports refreshed with new analysis data');
+      } else {
+        console.log('ℹ️ Analysis already in reports, skipping duplicate');
       }
     }
   }, [completedAnalyses]);
